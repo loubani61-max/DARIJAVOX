@@ -1,0 +1,12 @@
+{
+  "name": "DarijaVox",
+  "description": "Professional Moroccan Darija script generator and voice-over studio specializing in the Casablanca dialect.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "Text-to-Speech",
+    "Audio Generation",
+    "Dialect Translation"
+  ]
+}
