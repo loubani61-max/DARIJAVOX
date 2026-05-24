@@ -244,12 +244,12 @@ export default function App() {
         <motion.div 
           animate={{ scale: [1, 1.3, 1], x: [0, 70, 0], y: [0, -40, 0] }}
           transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute -top-40 -left-40 w-[30rem] h-[30rem] bg-pastel-mint/80 rounded-full blur-[120px]"
+          className="absolute -top-40 -left-40 w-[30rem] h-[30rem] bg-violet-600/10 rounded-full blur-[120px]"
         />
         <motion.div 
           animate={{ scale: [1, 1.2, 1], x: [0, -70, 0], y: [0, 60, 0] }}
           transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute -bottom-40 -right-40 w-[30rem] h-[30rem] bg-pastel-lavender/80 rounded-full blur-[120px]"
+          className="absolute -bottom-40 -right-40 w-[30rem] h-[30rem] bg-pink-500/10 rounded-full blur-[120px]"
         />
       </div>
 
@@ -259,31 +259,86 @@ export default function App() {
           animate={{ opacity: 1, y: 0 }}
           className="flex items-center"
         >
-          {/* Recreating the DarijaVox Logo exactly as requested */}
+          {/* Custom brand DarijaVox logo with the circular purple badge and custom monogram DV matching the user uploaded logo beautifully */}
           <div className="h-28 md:h-36 w-auto select-none drop-shadow-2xl">
-            <svg viewBox="0 0 1024 1024" className="h-full w-auto filter drop-shadow-xl" xmlns="http://www.w3.org/2000/svg">
-              {/* Background Blue Square */}
-              <rect width="900" height="900" x="62" y="62" rx="180" fill="#3D9BEE" />
-              
-              {/* White Document */}
-              <path d="M220 300 C 220 285, 235 270, 250 270 H 460 L 550 360 V 700 C 550 715, 535 730, 520 730 H 250 C 235 730, 220 715, 220 700 Z" fill="white" />
-              <rect x="280" y="420" width="180" height="25" rx="5" fill="#3D9BEE" opacity="0.6" />
-              <rect x="280" y="475" width="150" height="25" rx="5" fill="#3D9BEE" opacity="0.6" />
-              <rect x="280" y="530" width="120" height="25" rx="5" fill="#3D9BEE" opacity="0.6" />
-              <path d="M460 270 V 315 C 460 340, 485 365, 510 365 H 550 L 460 270 Z" fill="#E0E0E0" />
+            <svg viewBox="0 0 800 800" className="h-full w-auto" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                {/* Background circular gradient */}
+                <linearGradient id="bg-grad" x1="0.8" y1="0.1" x2="0.2" y2="0.9">
+                  <stop offset="0%" stopColor="#2e0f6c" />
+                  <stop offset="50%" stopColor="#170644" />
+                  <stop offset="100%" stopColor="#080121" />
+                </linearGradient>
 
-              {/* Speaker / Megaphone (Blue Shades for 3D/Origami effect) */}
-              <path d="M480 500 L 710 370 V 730 L 480 600 Z" fill="#2E7ED4" />
-              <path d="M480 500 L 640 500 L 710 730 L 480 600 Z" fill="#5AA6F7" />
-              <path d="M480 500 L 600 520 L 710 370 Z" fill="#8AC2FF" />
-              
-              {/* Sound Waves */}
-              <path d="M750 490 Q 770 550 750 610" stroke="white" strokeWidth="25" fill="none" strokeLinecap="round" strokeOpacity="0.4" />
-              <path d="M790 450 Q 820 550 790 650" stroke="white" strokeWidth="25" fill="none" strokeLinecap="round" strokeOpacity="0.7" />
-              <path d="M830 410 Q 880 550 830 690" stroke="white" strokeWidth="28" fill="none" strokeLinecap="round" />
+                {/* V monogram and visualizer bars gradient */}
+                <linearGradient id="v-grad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="#f472b6" />
+                  <stop offset="50%" stopColor="#a855f7" />
+                  <stop offset="100%" stopColor="#6366f1" />
+                </linearGradient>
 
-              {/* Text Label */}
-              <text x="512" y="855" fontSize="145" fontWeight="900" fill="white" textAnchor="middle" style={{ fontFamily: 'Outfit, sans-serif', letterSpacing: '4px' }}>DARIJAVOX</text>
+                {/* D monogram gradient */}
+                <linearGradient id="d-grad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#ffffff" />
+                  <stop offset="85%" stopColor="#ffffff" />
+                  <stop offset="100%" stopColor="#f1f5f9" />
+                </linearGradient>
+
+                {/* Soft natural drop shadow for origami overlap look */}
+                <filter id="v-shadow" x="-30%" y="-30%" width="160%" height="160%">
+                  <feDropShadow dx="-8" dy="8" stdDeviation="8" floodColor="#000000" floodOpacity="0.6" />
+                </filter>
+              </defs>
+
+              {/* Background circular badge */}
+              <circle cx="400" cy="400" r="380" fill="url(#bg-grad)" />
+
+              {/* Bold stylized D Monogram in the center */}
+              <path 
+                d="M 180,210 H 310 C 390,210 435,255 435,335 C 435,415 390,460 310,460 H 180 Z M 240,265 V 405 H 300 C 350,405 372,380 372,335 C 372,290 350,265 300,265 Z" 
+                fill="url(#d-grad)" 
+              />
+
+              {/* Fluid, layered brand V Monogram overlaying the D with soft shadow */}
+              <path 
+                d="M 390,210 L 470,450 H 525 L 610,210 H 550 L 498,390 L 445,210 Z" 
+                fill="url(#v-grad)"
+                filter="url(#v-shadow)"
+              />
+
+              {/* High-fidelity sound wave vertical indicators aligned perfectly with monogram */}
+              <rect x="635" y="315" width="10" height="40" rx="5" fill="url(#v-grad)" />
+              <rect x="655" y="275" width="10" height="120" rx="5" fill="url(#v-grad)" />
+              <rect x="675" y="250" width="10" height="170" rx="5" fill="url(#v-grad)" />
+              <rect x="695" y="285" width="10" height="100" rx="5" fill="url(#v-grad)" />
+              <rect x="715" y="315" width="10" height="40" rx="5" fill="url(#v-grad)" />
+
+              {/* Primary Typographic Wordmark */}
+              <text 
+                x="400" 
+                y="585" 
+                textAnchor="middle" 
+                fontFamily="'Outfit', 'Inter', sans-serif" 
+                fontSize="96" 
+                letterSpacing="-1"
+              >
+                <tspan fill="#ffffff" fontWeight="800">Darija</tspan>
+                <tspan fill="url(#v-grad)" fontWeight="800">Vox</tspan>
+              </text>
+
+              {/* Premium sub-text credit */}
+              <text 
+                x="560" 
+                y="642" 
+                textAnchor="middle" 
+                fontFamily="'Inter', 'Outfit', sans-serif" 
+                fontWeight="700" 
+                fontSize="30" 
+                fill="#f472b6" 
+                letterSpacing="0.5"
+              >
+                by Samir Loubani
+              </text>
             </svg>
           </div>
         </motion.div>
@@ -294,15 +349,15 @@ export default function App() {
           className="hidden md:flex items-center gap-6"
         >
           <div className="flex flex-col items-end">
-            <span className="text-[10px] font-mono uppercase opacity-40">System Status</span>
+            <span className="text-[10px] font-mono uppercase opacity-40 text-slate-400">System Status</span>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
-              <span className="text-xs font-semibold">ALL SYSTEMS NOMINAL</span>
+              <span className="text-xs font-semibold text-slate-100">ALL SYSTEMS NOMINAL</span>
             </div>
           </div>
           <div className="glass-card p-3 flex items-center gap-2 overflow-hidden glow-border">
-             <Settings className="w-4 h-4 opacity-40" />
-             <span className="text-xs font-medium">Samir LOUBANI Studio</span>
+             <Settings className="w-4 h-4 opacity-40 text-slate-400" />
+             <span className="text-xs font-medium text-slate-300">Samir LOUBANI Studio</span>
           </div>
         </motion.div>
       </header>
@@ -318,9 +373,9 @@ export default function App() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-slate-400" />
-                <h2 className="text-sm font-display font-medium uppercase tracking-wider text-slate-500">Source Text</h2>
+                <h2 className="text-sm font-display font-medium uppercase tracking-wider text-slate-400">Source Text</h2>
               </div>
-              <div className="px-3 py-1 rounded-full bg-slate-900/5 text-[10px] font-bold text-slate-500">
+              <div className="px-3 py-1 rounded-full bg-white/5 text-[10px] font-bold text-slate-400 border border-white/5">
                 AI CORE ACTIVATED
               </div>
             </div>
@@ -329,10 +384,10 @@ export default function App() {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               placeholder="Enter your script here..."
-              className="w-full h-56 bg-transparent text-xl font-medium placeholder:text-slate-300 resize-none outline-none border-none focus:ring-0 leading-relaxed transition-all"
+              className="w-full h-56 bg-transparent text-xl font-medium text-slate-100 placeholder:text-slate-500 resize-none outline-none border-none focus:ring-0 leading-relaxed transition-all"
             />
             
-            <div className="flex items-center justify-between pt-4 border-t border-slate-900/5">
+            <div className="flex items-center justify-between pt-4 border-t border-white/10">
               <div className="flex gap-2">
                 {VOICES.slice(0, 3).map(voice => (
                   <button
@@ -340,8 +395,8 @@ export default function App() {
                     onClick={() => setSettings({ ...settings, voiceName: voice.id })}
                     className={`px-4 py-2 rounded-2xl text-[10px] font-bold uppercase transition-all ${
                       settings.voiceName === voice.id 
-                        ? 'bg-slate-900 text-white' 
-                        : 'bg-slate-900/5 text-slate-400 hover:bg-slate-900/10'
+                        ? 'bg-gradient-to-r from-fuchsia-600 to-indigo-600 text-white' 
+                        : 'bg-white/5 text-slate-400 hover:bg-white/10'
                     }`}
                   >
                     {voice.name.split(' ')[0]}
@@ -357,7 +412,7 @@ export default function App() {
             transition={{ delay: 0.1 }}
             onClick={handleGenerate}
             disabled={isGenerating || !inputText.trim()}
-            className="w-full h-20 glass-card bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 text-white font-display text-lg font-bold flex items-center justify-center gap-4 group transition-all"
+            className="w-full h-20 bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-600 hover:opacity-90 disabled:opacity-40 disabled:scale-100 text-white font-display text-lg font-bold flex items-center justify-center gap-4 group transition-all duration-300 active:scale-95 border border-white/20 shadow-lg shadow-purple-500/10 rounded-[2.5rem]"
           >
             <AnimatePresence mode="wait">
               {isGenerating ? (
@@ -396,12 +451,12 @@ export default function App() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="h-full min-h-[500px] glass-card flex flex-col items-center justify-center text-center p-12 border-dashed"
+                className="h-full min-h-[500px] glass-card flex flex-col items-center justify-center text-center p-12 border-dashed border-white/20"
               >
-                <div className="w-24 h-24 rounded-full bg-slate-900/5 flex items-center justify-center mb-8">
-                  <Headphones className="w-10 h-10 text-slate-300" />
+                <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center mb-8 border border-white/5">
+                  <Headphones className="w-10 h-10 text-slate-400" />
                 </div>
-                <h3 className="text-xl font-display font-medium text-slate-900 mb-2">Ready for Capture</h3>
+                <h3 className="text-xl font-display font-medium text-white mb-2">Ready for Capture</h3>
                 <p className="text-sm text-slate-400 max-w-xs mx-auto">
                   Submit a script to initiate the Moroccan synthesis process. Modern CAD for the Voice Industry.
                 </p>
@@ -414,36 +469,36 @@ export default function App() {
                 exit={{ opacity: 0 }}
                 className="h-full min-h-[500px] glass-card flex flex-col items-center justify-center p-12 relative overflow-hidden"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-pastel-mint/10 to-pastel-lavender/10 animate-pulse" />
+                <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-500/10 to-violet-500/10 animate-pulse" />
                 <div className="relative z-10 space-y-8 text-center w-full">
                    <div className="flex justify-center">
                      <div className="relative w-32 h-32">
                         <motion.div 
                           animate={{ rotate: 360 }}
                           transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-                          className="absolute inset-0 border-t-2 border-slate-900 rounded-full"
+                          className="absolute inset-0 border-t-2 border-fuchsia-500 rounded-full"
                         />
                         <motion.div 
                           animate={{ rotate: -360 }}
                           transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                          className="absolute inset-4 border-b-2 border-slate-400 rounded-full opacity-50"
+                          className="absolute inset-4 border-b-2 border-violet-500 rounded-full opacity-50"
                         />
                         <div className="absolute inset-0 m-auto w-12 h-12 flex items-center justify-center">
-                          <Mic className="w-6 h-6 text-slate-900" />
+                          <Mic className="w-6 h-6 text-white" />
                         </div>
                      </div>
                    </div>
                    <div>
-                     <h3 className="text-2xl font-display font-bold text-slate-900">Neural Synthesis</h3>
+                     <h3 className="text-2xl font-display font-bold text-white">Neural Synthesis</h3>
                      <p className="text-xs font-mono uppercase tracking-widest text-slate-400 mt-2">Harmonizing Cadence & Tone</p>
                    </div>
                    <div className="max-w-xs mx-auto">
-                     <div className="h-1 bg-slate-900/5 rounded-full overflow-hidden">
+                     <div className="h-1 bg-white/5 rounded-full overflow-hidden">
                         <motion.div 
                           initial={{ x: '-100%' }}
                           animate={{ x: '100%' }}
                           transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                          className="h-full w-1/2 bg-slate-900 rounded-full"
+                          className="h-full w-1/2 bg-gradient-to-r from-fuchsia-500 to-indigo-500 rounded-full"
                         />
                      </div>
                    </div>
@@ -462,13 +517,13 @@ export default function App() {
                       <div className="flex items-center gap-6">
                         <button 
                           onClick={togglePlayPause}
-                          className="w-20 h-20 rounded-full bg-slate-900 text-white flex items-center justify-center hover:scale-105 transition-transform shadow-2xl active:scale-95"
+                          className="w-20 h-20 rounded-full bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-600 text-white flex items-center justify-center hover:scale-105 transition-transform shadow-2xl shadow-purple-500/20 active:scale-95"
                         >
                           {isPlaying ? <Pause className="w-8 h-8 fill-current" /> : <Play className="w-8 h-8 fill-current ml-2" />}
                         </button>
                         <button 
                           onClick={restartAudio}
-                          className="w-14 h-14 rounded-full glass-card flex items-center justify-center hover:bg-slate-900/5 transition-all text-slate-400 hover:text-slate-900"
+                          className="w-14 h-14 rounded-full glass-card flex items-center justify-center hover:bg-white/10 transition-all text-slate-400 hover:text-white"
                         >
                           <RotateCcw className="w-5 h-5" />
                         </button>
@@ -476,7 +531,7 @@ export default function App() {
 
                       <button 
                          onClick={downloadAudio}
-                         className="px-8 py-4 glass-card bg-white hover:bg-slate-900 hover:text-white transition-all font-display text-sm font-bold flex items-center gap-3 active:scale-95"
+                         className="px-8 py-4 bg-gradient-to-r from-fuchsia-600/10 to-indigo-600/10 border border-fuchsia-500/20 hover:from-fuchsia-600/20 hover:to-indigo-600/20 text-white rounded-[2.5rem] transition-all font-display text-sm font-bold flex items-center gap-3 active:scale-95"
                       >
                          <Download className="w-5 h-5" />
                          <span>EXPORT MASTER (.MP3)</span>
@@ -491,7 +546,7 @@ export default function App() {
                         </div>
                         <span className="text-[10px] font-mono text-slate-400">24.0 KHZ / 128 KBPS</span>
                       </div>
-                      <div className="h-24 glass-card bg-slate-900/5 border-none flex items-end justify-center gap-1.5 p-6 overflow-hidden">
+                      <div className="h-24 glass-card bg-slate-950/20 border-white/5 border flex items-end justify-center gap-1.5 p-6 overflow-hidden">
                          {[...Array(40)].map((_, i) => (
                            <motion.div 
                              key={i}
@@ -506,7 +561,7 @@ export default function App() {
                                delay: i * 0.02,
                                ease: "easeInOut"
                              }}
-                             className="w-1.5 bg-slate-900/20 rounded-full"
+                             className="w-1.5 bg-fuchsia-500/80 rounded-full"
                              style={{ height: '4px' }}
                            />
                          ))}
@@ -516,33 +571,33 @@ export default function App() {
 
                 {/* Script Display */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <div className="glass-card p-8 space-y-4 bg-white/60">
-                      <div className="flex items-center justify-between text-slate-400">
-                        <span className="text-[10px] font-mono uppercase tracking-widest">Arabic Synthesis</span>
-                        <button onClick={() => copyToClipboard(script.arabicScript)} className="hover:text-slate-900 transition-colors">
-                          <Copy className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <p className="text-2xl font-bold leading-relaxed text-right arabic-font text-slate-900" dir="rtl">
+                  <div className="glass-card p-8 space-y-4 bg-slate-950/40 border border-white/5">
+                     <div className="flex items-center justify-between text-slate-400">
+                       <span className="text-[10px] font-mono uppercase tracking-widest">Arabic Synthesis</span>
+                       <button onClick={() => copyToClipboard(script.arabicScript)} className="hover:text-white transition-colors">
+                         <Copy className="w-4 h-4" />
+                       </button>
+                     </div>
+                     <p className="text-2xl font-bold leading-relaxed text-right arabic-font text-slate-100" dir="rtl">
                         {script.arabicScript}
                       </p>
                    </div>
 
-                   <div className="glass-card p-8 space-y-4 bg-white/60">
-                      <div className="flex items-center justify-between text-slate-400">
-                        <span className="text-[10px] font-mono uppercase tracking-widest">Phonetic Guide</span>
-                        <button onClick={() => copyToClipboard(script.phoneticScript)} className="hover:text-slate-900 transition-colors">
-                          <Copy className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <p className="text-sm font-mono text-slate-600 leading-relaxed">
+                  <div className="glass-card p-8 space-y-4 bg-slate-950/30 border border-white/5">
+                     <div className="flex items-center justify-between text-slate-400">
+                       <span className="text-[10px] font-mono uppercase tracking-widest">Phonetic Guide</span>
+                       <button onClick={() => copyToClipboard(script.phoneticScript)} className="hover:text-white transition-colors">
+                         <Copy className="w-4 h-4" />
+                       </button>
+                     </div>
+                     <p className="text-sm font-mono text-slate-300 leading-relaxed">
                         {script.phoneticScript}
                       </p>
                    </div>
                 </div>
 
                 {/* Director's Notes */}
-                <div className="glass-card p-8 bg-slate-900 text-white relative overflow-hidden">
+                <div className="glass-card p-8 bg-slate-950/60 border border-fuchsia-500/20 text-white relative overflow-hidden">
                    <motion.div 
                       className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/5 rounded-full blur-3xl"
                    />
@@ -565,9 +620,9 @@ export default function App() {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="p-6 glass-card bg-rose-50 border-rose-100 flex items-center gap-4 text-rose-600"
+                className="p-6 glass-card bg-rose-950/40 border border-rose-500/30 flex items-center gap-4 text-rose-300"
               >
-                <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center flex-shrink-0">
                   <AlertCircle className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
@@ -580,7 +635,7 @@ export default function App() {
         </div>
       </main>
 
-      <footer className="max-w-7xl mx-auto px-6 py-12 flex flex-col md:flex-row items-center justify-between border-t border-slate-900/5">
+      <footer className="max-w-7xl mx-auto px-6 py-12 flex flex-col md:flex-row items-center justify-between border-t border-white/10">
         <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-slate-400 mb-4 md:mb-0">
           Powered by Gemini 1.5 Pro & Samir LOUBANI Labs
         </p>

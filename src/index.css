@@ -13,14 +13,16 @@
 
 @layer base {
   body {
-    @apply bg-[var(--color-future-bg)] text-slate-800 font-sans antialiased overflow-x-hidden;
+    @apply bg-slate-950 text-slate-100 font-sans antialiased overflow-x-hidden;
     background-image: 
-      radial-gradient(at 0% 0%, rgba(157, 237, 222, 1) 0px, transparent 70%),
-      radial-gradient(at 100% 0%, rgba(204, 204, 255, 1) 0px, transparent 70%),
-      radial-gradient(at 100% 100%, rgba(255, 184, 184, 1) 0px, transparent 70%),
-      radial-gradient(at 0% 100%, rgba(157, 237, 222, 1) 0px, transparent 70%);
+      radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 60%),
+      radial-gradient(at 100% 0%, rgba(236, 72, 153, 0.15) 0px, transparent 60%),
+      radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.1) 0px, transparent 60%),
+      url('./assets/images/network_background_1779618740997.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     background-attachment: fixed;
-    animation: bg-shift 25s ease-in-out infinite alternate;
   }
 }
 
@@ -31,7 +33,7 @@
 
 @layer components {
   .glass-card {
-    @apply bg-white/40 backdrop-blur-xl border border-white/40 shadow-2xl shadow-slate-200/50 rounded-[2.5rem];
+    @apply bg-slate-950/45 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/60 rounded-[2.5rem];
   }
   
   .futuristic-btn {
