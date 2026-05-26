@@ -23,6 +23,7 @@ import {
   ChevronRight,
   Headphones,
   Radio,
+  Sliders,
   AudioLines as WaveIcon
 } from 'lucide-react';
 import { generateDarijaScript, generateDarijaAudio, type DarijaScript, type AudioSettings } from './services/geminiService';
@@ -43,11 +44,13 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toneDropdownOpen, setToneDropdownOpen] = useState(false);
 
   const [settings, setSettings] = useState<AudioSettings>({
     voiceName: 'Kore',
     speakingRate: 1.0,
-    pitch: 1.0
+    pitch: 1.0,
+    tone: 'Standard'
   });
   
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -421,6 +424,67 @@ export default function App() {
                     </span>
                   </button>
                 ))}
+              </div>
+
+              {/* Ton (Tone) selection button and elegant dropdown */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setToneDropdownOpen(!toneDropdownOpen)}
+                  className={`px-4 py-2 rounded-2xl text-[10px] font-bold uppercase transition-all flex items-center gap-3 min-h-[44px] min-w-[100px] justify-between border ${
+                    settings.tone && settings.tone !== 'Standard'
+                      ? 'bg-gradient-to-r from-fuchsia-600/20 to-indigo-600/20 text-fuchsia-300 border-fuchsia-500/30'
+                      : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'
+                  }`}
+                >
+                  <div className="flex flex-col items-start gap-px">
+                    <span className="text-[7px] font-medium tracking-wider uppercase opacity-50">Ton</span>
+                    <span className="text-white text-[10px] font-bold">{settings.tone || 'Standard'}</span>
+                  </div>
+                  <Sliders className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
+                </button>
+
+                <AnimatePresence>
+                  {toneDropdownOpen && (
+                    <>
+                      {/* Click outside to close */}
+                      <div 
+                        className="fixed inset-0 z-30 cursor-default" 
+                        onClick={() => setToneDropdownOpen(false)} 
+                      />
+                      <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute right-0 bottom-full mb-3 z-40 w-44 bg-slate-950/95 border border-white/10 rounded-2xl shadow-2xl p-1.5 backdrop-blur-xl"
+                      >
+                        <div className="text-[8px] font-bold text-slate-500 uppercase tracking-widest px-3 py-1.5 border-b border-white/5 mb-1">
+                          Choisir le Ton
+                        </div>
+                        {['Standard', 'Excité', 'Calme', 'Rauque', 'Grave'].map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => {
+                              setSettings({ ...settings, tone: t });
+                              setToneDropdownOpen(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-between ${
+                              (settings.tone || 'Standard') === t
+                                ? 'bg-gradient-to-r from-fuchsia-600 to-indigo-600 text-white'
+                                : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                            }`}
+                          >
+                            <span>{t}</span>
+                            {(settings.tone || 'Standard') === t && (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                            )}
+                          </button>
+                        ))}
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
           </motion.div>

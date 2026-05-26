@@ -63,13 +63,27 @@ export interface AudioSettings {
   voiceName: string;
   speakingRate: number;
   pitch: number;
+  tone?: string;
 }
 
 export async function generateDarijaAudio(script: string, settings: AudioSettings): Promise<string | null> {
   try {
+    let prompt = `Speak this Moroccan Darija script naturally: ${script}`;
+    if (settings.tone) {
+      if (settings.tone === "Excité") {
+        prompt = `Speak this Moroccan Darija script with high energy, extreme excitement, enthusiasm, and a joyful tone: ${script}`;
+      } else if (settings.tone === "Calme") {
+        prompt = `Speak this Moroccan Darija script with a soft, calm, gentle, warm, and peaceful whisper-like voice: ${script}`;
+      } else if (settings.tone === "Rauque") {
+        prompt = `Speak this Moroccan Darija script in a husky, rough, slightly raspy, and hoarse voice: ${script}`;
+      } else if (settings.tone === "Grave") {
+        prompt = `Speak this Moroccan Darija script in a deep, low-pitched, solid, authoritative, and grave voice: ${script}`;
+      }
+    }
+
     const response = await ai.models.generateContent({
       model: "gemini-3.1-flash-tts-preview",
-      contents: [{ parts: [{ text: `Speak this Moroccan Darija script naturally: ${script}` }] }],
+      contents: [{ parts: [{ text: prompt }] }],
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
