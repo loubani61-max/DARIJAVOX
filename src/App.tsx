@@ -293,6 +293,17 @@ export default function App() {
               {/* Background circular badge */}
               <circle cx="400" cy="400" r="380" fill="url(#bg-grad)" />
 
+              {/* Light accent circle of color #1186AD around the logo */}
+              <circle 
+                cx="400" 
+                cy="400" 
+                r="390" 
+                fill="none" 
+                stroke="#1186AD" 
+                strokeWidth="6" 
+                strokeOpacity="0.8" 
+              />
+
               {/* Bold stylized D Monogram in the center */}
               <path 
                 d="M 180,210 H 310 C 390,210 435,255 435,335 C 435,415 390,460 310,460 H 180 Z M 240,265 V 405 H 300 C 350,405 372,380 372,335 C 372,290 350,265 300,265 Z" 
@@ -373,7 +384,10 @@ export default function App() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-slate-400" />
-                <h2 className="text-sm font-display font-medium uppercase tracking-wider text-slate-400">Source Text</h2>
+                <div className="flex flex-col">
+                  <h2 className="text-sm font-display font-medium uppercase tracking-wider text-slate-400">Texte Source</h2>
+                  <span className="text-[10px] text-fuchsia-400/80 font-mono uppercase tracking-wide">N'importe quelle langue</span>
+                </div>
               </div>
               <div className="px-3 py-1 rounded-full bg-white/5 text-[10px] font-bold text-slate-400 border border-white/5">
                 AI CORE ACTIVATED
@@ -383,7 +397,7 @@ export default function App() {
             <textarea
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Enter your script here..."
+              placeholder="Écrivez ou collez votre script dans n'importe quelle langue (Français, Anglais, Arabe standard, Espagnol, etc.) pour le traduire et le synthétiser en Darija marocain..."
               className="w-full h-56 bg-transparent text-xl font-medium text-slate-100 placeholder:text-slate-500 resize-none outline-none border-none focus:ring-0 leading-relaxed transition-all"
             />
             
@@ -393,13 +407,18 @@ export default function App() {
                   <button
                     key={voice.id}
                     onClick={() => setSettings({ ...settings, voiceName: voice.id })}
-                    className={`px-4 py-2 rounded-2xl text-[10px] font-bold uppercase transition-all ${
+                    className={`px-5 py-2 rounded-2xl text-[10px] font-bold uppercase transition-all flex flex-col items-center justify-center gap-0.5 min-w-[70px] ${
                       settings.voiceName === voice.id 
                         ? 'bg-gradient-to-r from-fuchsia-600 to-indigo-600 text-white' 
                         : 'bg-white/5 text-slate-400 hover:bg-white/10'
                     }`}
                   >
-                    {voice.name.split(' ')[0]}
+                    <span>{voice.name.split(' ')[0]}</span>
+                    <span className={`text-[8px] font-medium tracking-wider lowercase transition-colors ${
+                      settings.voiceName === voice.id ? 'text-white/80' : 'text-slate-500'
+                    }`}>
+                      {voice.gender.toLowerCase()}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -424,7 +443,7 @@ export default function App() {
                   className="flex items-center gap-3"
                 >
                   <Sparkles className="w-6 h-6 animate-spin" />
-                  <span>Synthesizing Dialect...</span>
+                  <span>Synthèse du dialecte...</span>
                 </motion.div>
               ) : (
                 <motion.div 
@@ -434,7 +453,7 @@ export default function App() {
                   exit={{ opacity: 0 }}
                   className="flex items-center gap-3"
                 >
-                  <span>Generate Moroccan Audio</span>
+                  <span>Générer l'Audio en Darija</span>
                   <ChevronRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
                 </motion.div>
               )}
@@ -456,9 +475,9 @@ export default function App() {
                 <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center mb-8 border border-white/5">
                   <Headphones className="w-10 h-10 text-slate-400" />
                 </div>
-                <h3 className="text-xl font-display font-medium text-white mb-2">Ready for Capture</h3>
+                <h3 className="text-xl font-display font-medium text-white mb-2">Prêt pour la Synthèse</h3>
                 <p className="text-sm text-slate-400 max-w-xs mx-auto">
-                  Submit a script to initiate the Moroccan synthesis process. Modern CAD for the Voice Industry.
+                  Saisissez un texte dans n'importe quelle langue pour lancer la traduction et la synthèse vocale en Darija marocain.
                 </p>
               </motion.div>
             ) : isGenerating ? (

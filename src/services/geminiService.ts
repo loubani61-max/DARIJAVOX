@@ -1,6 +1,13 @@
-import { GoogleGenAI, Modality, Type } from "@google/genai";
+import { GoogleGenAI, Modality, Type, ThinkingLevel } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = new GoogleGenAI({ 
+  apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    headers: {
+      'User-Agent': 'aistudio-build',
+    }
+  }
+});
 
 export interface DarijaScript {
   arabicScript: string;
@@ -11,11 +18,14 @@ export interface DarijaScript {
 export async function generateDarijaScript(sourceText: string): Promise<DarijaScript> {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Acting as a professional Moroccan Darija Voice-Over artist from Casablanca, convert the following text into a natural, authentic, and "Clean Casablanca" Darija script.
+      model: "gemini-3.5-flash",
+      contents: `Acting as a professional Moroccan Darija Voice-Over artist and expert translator from Casablanca, convert the following text (which can be in any language, including Standard Arabic, French, English, Spanish, German, etc.) into a natural, authentic, and "Clean Casablanca" Darija script. Translate and adapt the meaning and tone fully to local Moroccan Darija.
       
       Source Text: "${sourceText}"`,
       config: {
+        thinkingConfig: {
+          thinkingLevel: ThinkingLevel.LOW,
+        },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
