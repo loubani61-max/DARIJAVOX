@@ -24,9 +24,17 @@ import {
   Headphones,
   Radio,
   Sliders,
+  Key,
+  Lock,
+  Unlock,
+  Info,
+  Sun,
+  Moon,
+  Eye,
+  EyeOff,
   AudioLines as WaveIcon
 } from 'lucide-react';
-import { generateDarijaScript, generateDarijaAudio, type DarijaScript, type AudioSettings } from './services/geminiService';
+import { generateDarijaScript, generateDarijaAudio, hasDefaultApiKey, type DarijaScript, type AudioSettings } from './services/geminiService';
 
 const VOICES = [
   { id: 'Kore', name: 'Kore (Female - Neutral)', gender: 'Female' },
@@ -39,12 +47,19 @@ const VOICES = [
 export default function App() {
   const [inputText, setInputText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [script, setScript] = useState<DarijaScript | null>(null);
   const [audioBase64, setAudioBase64] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toneDropdownOpen, setToneDropdownOpen] = useState(false);
+  
+  const [apiKey, setApiKey] = useState(() => {
+    return typeof window !== 'undefined' ? localStorage.getItem('darijavox_gemini_api_key') || '' : '';
+  });
+  const [tempApiKey, setTempApiKey] = useState(apiKey);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
   const [settings, setSettings] = useState<AudioSettings>({
     voiceName: 'Kore',
@@ -53,11 +68,64 @@ export default function App() {
     tone: 'Standard'
   });
   
+  const [isLocalVoiceFallbackActive, setIsLocalVoiceFallbackActive] = useState(false);
+  
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('darijavox_theme') as 'dark' | 'light') || 'dark';
+    }
+    return 'dark';
+  });
+  const [screenDim, setScreenDim] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      return Number(localStorage.getItem('darijavox_screendim') || '0');
+    }
+    return 0;
+  });
+  const [blueLightFilter, setBlueLightFilter] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      return Number(localStorage.getItem('darijavox_bluelight') || '0');
+    }
+    return 0;
+  });
+  const [showVisualComfortMenu, setShowVisualComfortMenu] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('darijavox_theme', theme);
+      if (theme === 'light') {
+        document.documentElement.classList.add('light-theme');
+      } else {
+        document.documentElement.classList.remove('light-theme');
+      }
+    }
+  }, [theme]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('darijavox_screendim', String(screenDim));
+    }
+  }, [screenDim]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('darijavox_bluelight', String(blueLightFilter));
+    }
+  }, [blueLightFilter]);
+  
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
   const startTimeRef = useRef<number>(0);
   const pausedAtRef = useRef<number>(0);
   const audioBufferRef = useRef<AudioBuffer | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   const handleGenerate = async () => {
     if (!inputText.trim()) return;
@@ -69,20 +137,79 @@ export default function App() {
     setIsPlaying(false);
     setIsPaused(false);
     
+    // Proactive check for API key
+    if (!apiKey && !hasDefaultApiKey()) {
+      setError("Clé API Gemini absente. Puisque vous avez déployé l'application (par exemple sur Cloudflare), vous devez configurer votre propre Clé API Gemini (gratuite). Cliquez sur le bouton 'Configurer Clé API' en haut à droite !");
+      setShowApiKeyModal(true);
+      setIsGenerating(false);
+      return;
+    }
+    
     try {
+      setIsLocalVoiceFallbackActive(false);
       const generatedScript = await generateDarijaScript(inputText);
       setScript(generatedScript);
       
-      const audio = await generateDarijaAudio(generatedScript.arabicScript, settings);
-      if (audio) {
-        setAudioBase64(audio);
-        prepareAudio(audio);
+      try {
+        const audio = await generateDarijaAudio(generatedScript.arabicScript, generatedScript.phoneticScript, settings);
+        if (audio) {
+          setAudioBase64(audio);
+          prepareAudio(audio);
+        }
+      } catch (audioErr) {
+        console.warn("Gemini TTS audio generation failed, activating local speech synthesis fallback.", audioErr);
+        setIsLocalVoiceFallbackActive(true);
       }
     } catch (err: any) {
-      setError(`L-khata2 f l-khidma: ${err.message || 'L-moushkil ma3roufsh'}. Réessayez s'il vous plaît.`);
+      const errMsg = err.message || '';
+      if (errMsg === 'API_KEY_MISSING' || errMsg.includes('API key') || errMsg.includes('KEY_INVALID') || errMsg.includes('API_KEY')) {
+        setError("Clé API Gemini invalide ou absente. S'il vous plaît, configurez une clé API valide pour DarijaVox.");
+        setShowApiKeyModal(true);
+      } else {
+        setError(`L-khata2 f l-khidma: ${errMsg || 'L-moushkil ma3roufsh'}. Réessayez s'il vous plaît.`);
+      }
       console.error('Generation error:', err);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleGenerateAudioOnly = async () => {
+    if (!script) return;
+    setIsGeneratingAudio(true);
+    setError(null);
+    setAudioBase64(null);
+    setIsPlaying(false);
+    setIsPaused(false);
+    
+    audioBufferRef.current = null;
+    
+    if (!apiKey && !hasDefaultApiKey()) {
+      setError("Clé API Gemini absente. S'il vous plaît, configurez votre clé API Gemini (gratuite) pour continuer.");
+      setShowApiKeyModal(true);
+      setIsGeneratingAudio(false);
+      return;
+    }
+
+    try {
+      setIsLocalVoiceFallbackActive(false);
+      const audio = await generateDarijaAudio(script.arabicScript, script.phoneticScript, settings);
+      if (audio) {
+        setAudioBase64(audio);
+        await prepareAudio(audio);
+      }
+    } catch (err: any) {
+      const errMsg = err.message || '';
+      if (errMsg === 'API_KEY_MISSING' || errMsg.includes('API key') || errMsg.includes('KEY_INVALID') || errMsg.includes('API_KEY')) {
+        setError("Clé API Gemini invalide ou absente. S'il vous plaît, configurer votre clé pour continuer.");
+        setShowApiKeyModal(true);
+      } else {
+        console.warn('Gemini TTS audio generation failed, falling back to browser-native synthesis:', err);
+        setIsLocalVoiceFallbackActive(true);
+      }
+      console.error('Voice generation error:', err);
+    } finally {
+      setIsGeneratingAudio(false);
     }
   };
 
@@ -108,6 +235,68 @@ export default function App() {
   };
 
   const togglePlayPause = async () => {
+    if (isLocalVoiceFallbackActive) {
+      if (isPlaying) {
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+          window.speechSynthesis.pause();
+        }
+        setIsPlaying(false);
+        setIsPaused(true);
+      } else {
+        if (isPaused) {
+          if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+            window.speechSynthesis.resume();
+          }
+          setIsPlaying(true);
+          setIsPaused(false);
+        } else {
+          if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            
+            let cleanText = script?.arabicScript || '';
+            // Remove parenthetical notes
+            cleanText = cleanText.replace(/\([^)]*\)/g, "");
+            cleanText = cleanText.replace(/\[[^\]]*\]/g, "");
+            cleanText = cleanText.replace(/\s+/g, " ").trim();
+            
+            if (!cleanText && script) {
+              cleanText = script.arabicScript;
+            }
+            
+            const utterance = new SpeechSynthesisUtterance(cleanText);
+            const voices = window.speechSynthesis.getVoices();
+            let arabicVoice = voices.find(v => v.lang.toLowerCase().includes('ar-ma')) ||
+                              voices.find(v => v.lang.toLowerCase().includes('ar')) ||
+                              voices.find(v => v.lang.toLowerCase().includes('fr')) ||
+                              voices[0];
+            
+            if (arabicVoice) {
+              utterance.voice = arabicVoice;
+            }
+            
+            utterance.rate = settings.speakingRate || 1.0;
+            utterance.pitch = settings.pitch || 1.0;
+            
+            utterance.onend = () => {
+              setIsPlaying(false);
+              setIsPaused(false);
+            };
+            
+            utterance.onerror = (e) => {
+              console.error("SpeechSynthesis error:", e);
+              setIsPlaying(false);
+              setIsPaused(false);
+            };
+            
+            setIsPlaying(true);
+            setIsPaused(false);
+            window.speechSynthesis.speak(utterance);
+          }
+        }
+      }
+      return;
+    }
+
     if (!audioBufferRef.current) {
       if (audioBase64) await prepareAudio(audioBase64);
       else return;
@@ -148,6 +337,17 @@ export default function App() {
   };
 
   const restartAudio = () => {
+    if (isLocalVoiceFallbackActive) {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      setIsPaused(false);
+      setTimeout(() => {
+        togglePlayPause();
+      }, 50);
+      return;
+    }
+
     if (sourceNodeRef.current) {
       sourceNodeRef.current.stop();
       sourceNodeRef.current = null;
@@ -241,7 +441,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen font-sans">
+    <div className={`min-h-screen font-sans transition-colors duration-500 ${theme === 'light' ? 'bg-slate-50 text-slate-900 light-theme' : 'bg-slate-950 text-slate-100'}`}>
       {/* Dynamic Background Elements */}
       <div className="fixed inset-0 overflow-hidden -z-10 pointer-events-none">
         <motion.div 
@@ -360,16 +560,187 @@ export default function App() {
         <motion.div 
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="hidden md:flex items-center gap-6"
+          className="flex items-center gap-3 md:gap-6"
         >
-          <div className="flex flex-col items-end">
+          {/* Mobile and Desktop clickable API Key Configuration */}
+          <button 
+            type="button"
+            onClick={() => {
+              setTempApiKey(apiKey);
+              setShowApiKeyModal(true);
+            }}
+            className={`glass-card p-2.5 md:p-3 flex items-center gap-2 overflow-hidden cursor-pointer transition-all border ${
+              apiKey || hasDefaultApiKey()
+                ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/20' 
+                : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/20 animate-pulse'
+            }`}
+          >
+             <Key className="w-3.5 h-3.5 md:w-4 md:h-4 text-emerald-400/80" style={{ color: !(apiKey || hasDefaultApiKey()) ? '#fbbf24' : '#34d399' }} />
+             <span className="text-[9px] md:text-xs font-semibold uppercase tracking-wider">
+               {apiKey || hasDefaultApiKey() ? 'Clé API Active' : 'Configurer Clé API'}
+             </span>
+          </button>
+
+          {/* Confort Visuel / Protection des Yeux Control */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowVisualComfortMenu(!showVisualComfortMenu)}
+              className={`glass-card p-2.5 md:p-3 flex items-center gap-2 overflow-hidden cursor-pointer transition-all border select-none ${
+                screenDim > 0 || blueLightFilter > 0 || theme === 'light'
+                  ? 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border-indigo-500/25 shadow-[0_0_12px_rgba(99,102,241,0.15)]'
+                  : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/5'
+              }`}
+              title="Ajustements de l'écran & Protection oculaire"
+            >
+              <Eye className="w-3.5 h-3.5 md:w-4 md:h-4 text-indigo-400" />
+              <span className="text-[9px] md:text-xs font-semibold uppercase tracking-wider">
+                Yeux
+              </span>
+            </button>
+
+            <AnimatePresence>
+              {showVisualComfortMenu && (
+                <>
+                  {/* Backdrop to close the popover on clicking outer area */}
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setShowVisualComfortMenu(false)} 
+                  />
+                  
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute right-0 mt-3 w-80 glass-card p-6 z-50 shadow-2xl border border-white/10 space-y-6 bg-slate-900/95 backdrop-blur-2xl"
+                  >
+                    <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                      <div className="flex items-center gap-2">
+                        <Eye className="w-4 h-4 text-indigo-400" />
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                          Confort Visuel
+                        </h4>
+                      </div>
+                      <span className="text-[9px] font-mono bg-indigo-500/20 text-indigo-300 px-2.5 py-0.5 rounded-full uppercase font-bold">
+                        PROTÈGE-YEUX
+                      </span>
+                    </div>
+
+                    {/* Brightness/Mode Slider */}
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center text-[11px] font-semibold text-slate-300 uppercase tracking-wider">
+                        <span>Luminosité (Thème)</span>
+                        <span className="text-fuchsia-400 font-mono text-xs font-bold font-display">
+                          {theme === 'dark' ? 'Sombre' : 'Clair'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 bg-black/20 p-1 rounded-2xl border border-white/5">
+                        <button
+                          type="button"
+                          onClick={() => setTheme('dark')}
+                          className={`py-2 rounded-xl text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1.5 ${
+                            theme === 'dark'
+                              ? 'bg-gradient-to-r from-fuchsia-600 to-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                          }`}
+                        >
+                          <Moon className="w-3 h-3" />
+                          Noircir (Sombre)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTheme('light')}
+                          className={`py-2 rounded-xl text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1.5 ${
+                            theme === 'light'
+                              ? 'bg-white text-slate-950 shadow-lg'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                          }`}
+                        >
+                          <Sun className="w-3 h-3 text-amber-500" />
+                          Éclaircir (Clair)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Dimmer Slider to dark overlays */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-[11px] font-semibold text-slate-300 uppercase tracking-wider">
+                        <div className="flex items-center gap-1.5">
+                          <Moon className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Filtre d'Ombrage</span>
+                        </div>
+                        <span className="font-mono text-indigo-400 text-xs font-bold">{screenDim}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="80"
+                        value={screenDim}
+                        onChange={(e) => setScreenDim(Number(e.target.value))}
+                        className="w-full h-1.5 bg-black/30 rounded-lg appearance-none cursor-pointer accent-indigo-500 outline-none border border-white/5 animate-none"
+                      />
+                      <div className="flex justify-between text-[9px] text-slate-500 font-mono">
+                        <span>Fermé (0%)</span>
+                        <span>Max (80%)</span>
+                      </div>
+                    </div>
+
+                    {/* Blue Light Filter Slider */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-[11px] font-semibold text-slate-300 uppercase tracking-wider">
+                        <div className="flex items-center gap-1.5">
+                          <Eye className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Anti-Lumière Bleue</span>
+                        </div>
+                        <span className="font-mono text-amber-400 text-xs font-bold">{blueLightFilter}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="70"
+                        value={blueLightFilter}
+                        onChange={(e) => setBlueLightFilter(Number(e.target.value))}
+                        className="w-full h-1.5 bg-black/30 rounded-lg appearance-none cursor-pointer accent-amber-500 outline-none border border-white/5 animate-none"
+                      />
+                      <div className="flex justify-between text-[9px] text-slate-500 font-mono">
+                        <span>Désactivé (0%)</span>
+                        <span>Chaud (70%)</span>
+                      </div>
+                    </div>
+
+                    {/* System Information */}
+                    <p className="text-[10px] leading-relaxed text-slate-400 italic font-medium pt-1 border-t border-white/5">
+                      Ajustez ces curseurs de protection oculaire pour réduire la fatigue visuelle lors des sessions nocturnes.
+                    </p>
+
+                    {/* Reset Button */}
+                    {(screenDim > 0 || blueLightFilter > 0 || theme === 'light') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setScreenDim(0);
+                          setBlueLightFilter(0);
+                          setTheme('dark');
+                        }}
+                        className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-2xl text-[10px] font-bold uppercase border border-white/5 transition-all text-center"
+                      >
+                        Paramètres par défaut
+                      </button>
+                    )}
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <div className="hidden md:flex flex-col items-end">
             <span className="text-[10px] font-mono uppercase opacity-40 text-slate-400">System Status</span>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
               <span className="text-xs font-semibold text-slate-100">ALL SYSTEMS NOMINAL</span>
             </div>
           </div>
-          <div className="glass-card p-3 flex items-center gap-2 overflow-hidden glow-border">
+          <div className="hidden md:flex glass-card p-3 items-center gap-2 overflow-hidden glow-border">
              <Settings className="w-4 h-4 opacity-40 text-slate-400" />
              <span className="text-xs font-medium text-slate-300">Samir LOUBANI Studio</span>
           </div>
@@ -596,38 +967,69 @@ export default function App() {
               >
                 {/* Audio Engine */}
                 <div className="glass-card p-10 space-y-8 relative overflow-hidden">
+                   {isLocalVoiceFallbackActive && (
+                     <motion.div 
+                       initial={{ opacity: 0, y: -10 }}
+                       animate={{ opacity: 1, y: 0 }}
+                       className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-3.5 text-xs text-amber-200 leading-relaxed"
+                     >
+                       <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                       <div className="space-y-1">
+                         <p className="font-semibold text-amber-100">Synthèse vocale locale active (Bascule automatique)</p>
+                         <p className="text-amber-300/80 text-[11px]">L'API de synthèse vocale en ligne de Google Gemini (tts-preview) a renvoyé une erreur 500 (caractéristique fréquente lors de l'envoi d'arabe Unicode sur un hébergement public ou d'une limitation de clé gratuite sur Cloudflare). Pour garantir un service ininterrompu, DarijaVox utilise le synthétiseur local de votre appareil pour lire le script !</p>
+                       </div>
+                     </motion.div>
+                   )}
+
                    <div className="flex flex-wrap items-center justify-between gap-6">
                       <div className="flex items-center gap-6">
                         <button 
                           onClick={togglePlayPause}
-                          className="w-20 h-20 rounded-full bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-600 text-white flex items-center justify-center hover:scale-105 transition-transform shadow-2xl shadow-purple-500/20 active:scale-95"
+                          disabled={isGeneratingAudio}
+                          className="w-20 h-20 rounded-full bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-600 text-white flex items-center justify-center hover:scale-105 transition-transform shadow-2xl shadow-purple-500/20 active:scale-95 disabled:opacity-50"
                         >
                           {isPlaying ? <Pause className="w-8 h-8 fill-current" /> : <Play className="w-8 h-8 fill-current ml-2" />}
                         </button>
                         <button 
                           onClick={restartAudio}
-                          className="w-14 h-14 rounded-full glass-card flex items-center justify-center hover:bg-white/10 transition-all text-slate-400 hover:text-white"
+                          disabled={isGeneratingAudio}
+                          className="w-14 h-14 rounded-full glass-card flex items-center justify-center hover:bg-white/10 transition-all text-slate-400 hover:text-white disabled:opacity-50"
                         >
                           <RotateCcw className="w-5 h-5" />
                         </button>
                       </div>
 
-                      <button 
-                         onClick={downloadAudio}
-                         className="px-8 py-4 bg-gradient-to-r from-fuchsia-600/10 to-indigo-600/10 border border-fuchsia-500/20 hover:from-fuchsia-600/20 hover:to-indigo-600/20 text-white rounded-[2.5rem] transition-all font-display text-sm font-bold flex items-center gap-3 active:scale-95"
-                      >
-                         <Download className="w-5 h-5" />
-                         <span>EXPORT MASTER (.MP3)</span>
-                      </button>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          onClick={handleGenerateAudioOnly}
+                          disabled={isGeneratingAudio}
+                          className="px-6 py-4 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-[2.5rem] transition-all font-display text-sm font-bold flex items-center gap-2.5 active:scale-95 disabled:opacity-50 shadow-md shadow-fuchsia-500/5"
+                        >
+                          <Sparkles className={`w-4 h-4 text-fuchsia-400 ${isGeneratingAudio ? 'animate-spin' : ''}`} />
+                          <span>{isGeneratingAudio ? 'REGÉNÉRATION EN COURS...' : 'REGÉNÉRER LA VOIX'}</span>
+                        </button>
+
+                        <button 
+                           onClick={downloadAudio}
+                           disabled={isGeneratingAudio || !audioBase64}
+                           className="px-8 py-4 bg-gradient-to-r from-fuchsia-600/10 to-indigo-600/10 border border-fuchsia-500/20 hover:from-fuchsia-600/20 hover:to-indigo-600/20 text-white rounded-[2.5rem] transition-all font-display text-sm font-bold flex items-center gap-3 active:scale-95 disabled:opacity-40"
+                           title={isLocalVoiceFallbackActive ? "L'exportation MP3 n'est pas disponible en mode synthèse vocale locale." : "Exporter en fichier audio (.MP3)"}
+                        >
+                           <Download className="w-5 h-5" />
+                           <span>EXPORT MASTER (.MP3)</span>
+                        </button>
+                      </div>
                    </div>
 
                    <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <WaveIcon className="w-4 h-4 text-slate-400" />
-                          <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-400">Atmospheric Monitor</span>
+                           <WaveIcon className="w-4 h-4 text-slate-400" />
+                           <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-400">Atmospheric Monitor</span>
                         </div>
-                        <span className="text-[10px] font-mono text-slate-400">24.0 KHZ / 128 KBPS</span>
+                        <span className="text-[10px] font-mono text-slate-400">
+                          {isGeneratingAudio ? 'VOICE SYNTHESIS ACTIVE' : '24.0 KHZ / 128 KBPS'}
+                        </span>
                       </div>
                       <div className="h-24 glass-card bg-slate-950/20 border-white/5 border flex items-end justify-center gap-1.5 p-6 overflow-hidden">
                          {[...Array(40)].map((_, i) => (
@@ -636,7 +1038,9 @@ export default function App() {
                              animate={{ 
                                height: isPlaying 
                                  ? [Math.random() * 20 + 5, Math.random() * 80 + 10, Math.random() * 20 + 5] 
-                                 : 4 
+                                 : isGeneratingAudio
+                                   ? [Math.random() * 30 + 10, Math.random() * 60 + 20, Math.random() * 30 + 10]
+                                   : 4 
                              }}
                              transition={{ 
                                duration: 0.4, 
@@ -730,6 +1134,135 @@ export default function App() {
           <span>EST. 2026 // CASABLANCA</span>
         </div>
       </footer>
+
+      {/* Elegant, fully responsive and accessible Gemini API key modal config */}
+      <AnimatePresence>
+        {showApiKeyModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop with elegant blur */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowApiKeyModal(false)}
+              className="absolute inset-0 bg-slate-950/85 backdrop-blur-md cursor-pointer"
+            />
+            
+            {/* Modal card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-lg glass-card border border-white/10 bg-slate-900/90 p-8 md:p-10 shadow-2xl rounded-[2.5rem] overflow-hidden"
+            >
+              {/* Outer soft glows */}
+              <div className="absolute -top-12 -right-12 w-36 h-36 bg-fuchsia-500/10 rounded-full blur-2xl pointer-events-none" />
+              <div className="absolute -bottom-12 -left-12 w-36 h-36 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
+
+              <div className="relative z-10 space-y-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-r from-fuchsia-600 to-indigo-600 flex items-center justify-center text-white shrink-0">
+                    <Key className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-display font-bold text-white uppercase tracking-wider">Mettre à Jour la Clé API</h3>
+                    <p className="text-xs text-slate-400">Pour le bon fonctionnement de DarijaVox sur Cloudflare</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4 text-slate-300 text-xs md:text-sm leading-relaxed">
+                  <p>
+                    DarijaVox utilise l'API de pointe **Gemini** pour traduire vos textes puis générer les voix de synthèse.
+                  </p>
+                  <p className="text-slate-400">
+                    Comme l'application est maintenant déployée sur votre propre domaine ou Cloudflare, vous devez fournir votre propre clé API Gemini (qui propose un niveau d'utilisation gratuit généreux). Votre clé reste stockée localement de manière sécurisée dans votre propre navigateur.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-mono text-slate-400 uppercase tracking-widest">Votre Clé API Gemini</label>
+                  <div className="relative flex items-center">
+                    <input
+                      type="password"
+                      value={tempApiKey || ''}
+                      onChange={(e) => setTempApiKey(e.target.value)}
+                      placeholder={hasDefaultApiKey() ? "••••••••••••••••••••••••" : "Votre clé API Gemini..."}
+                      className="w-full bg-slate-950/60 text-slate-100 placeholder:text-slate-600 font-mono text-sm px-4 py-3 rounded-2xl border border-white/5 outline-none focus:border-fuchsia-500/50 focus:ring-1 focus:ring-fuchsia-500/20 transition-all font-medium pr-24"
+                    />
+                    <div className="absolute right-2 flex gap-1">
+                      {tempApiKey && (
+                        <button
+                          type="button"
+                          onClick={() => setTempApiKey('')}
+                          className="px-2.5 py-1 text-[9px] font-mono font-bold uppercase rounded-lg text-rose-400 hover:bg-rose-500/10 transition-colors"
+                        >
+                          Effacer
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <a
+                      href="https://aistudio.google.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors underline flex items-center gap-1"
+                    >
+                      Obtenir une clé API gratuite sur Google AI Studio ↗
+                    </a>
+                    {hasDefaultApiKey() && (
+                      <span className="text-[10px] text-emerald-400 font-medium">
+                        Une clé par défaut est active
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex gap-4 pt-4 border-t border-white/5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      localStorage.setItem('darijavox_gemini_api_key', tempApiKey);
+                      setApiKey(tempApiKey);
+                      setShowApiKeyModal(false);
+                      setError(null);
+                    }}
+                    className="flex-1 py-3 bg-gradient-to-r from-fuchsia-600 to-indigo-600 hover:opacity-90 active:scale-98 text-white rounded-2xl font-bold text-xs uppercase tracking-wider transition-all"
+                  >
+                    Enregistrer la Clé
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKeyModal(false)}
+                    className="px-6 py-3 bg-white/5 hover:bg-white/10 active:scale-98 text-slate-300 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all border border-white/5"
+                  >
+                    Fermer
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Screen regulators (dimming & warmth overlays) utilizing absolute secure pointer-events-none */}
+      {screenDim > 0 && (
+        <div 
+          className="fixed inset-0 bg-black pointer-events-none z-[9999] transition-opacity duration-300" 
+          style={{ opacity: screenDim / 100 }} 
+        />
+      )}
+
+      {blueLightFilter > 0 && (
+        <div 
+          className="fixed inset-0 pointer-events-none z-[9998] transition-opacity duration-300" 
+          style={{ 
+            backgroundColor: 'rgba(251, 191, 36, 0.15)',
+            mixBlendMode: 'multiply',
+            opacity: blueLightFilter / 100
+          }} 
+        />
+      )}
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
