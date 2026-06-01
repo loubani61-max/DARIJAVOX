@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "darijavox",
+  "name": "darijavox1",
   "compatibility_date": "2026-05-31",
   "observability": {
     "enabled": true
