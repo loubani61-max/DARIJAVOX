@@ -93,6 +93,9 @@
 .light-theme .bg-white\/5 { background-color: rgba(15, 23, 42, 0.03) !important; }
 .light-theme .bg-white\/10 { background-color: rgba(15, 23, 42, 0.06) !important; }
 .light-theme .bg-slate-950\/20 { background-color: rgba(255, 255, 255, 0.5) !important; }
+.light-theme .bg-slate-900\/50 { background-color: rgba(241, 245, 249, 0.9) !important; }
+.light-theme .bg-black\/30 { background-color: rgba(226, 232, 240, 0.8) !important; }
+.light-theme .bg-slate-800\/80 { background-color: rgba(203, 213, 225, 0.8) !important; }
 
 .light-theme textarea {
   color: #0c111d !important;

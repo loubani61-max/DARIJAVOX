@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import lamejs from 'lamejs';
 import { 
@@ -32,9 +32,45 @@ import {
   Moon,
   Eye,
   EyeOff,
-  AudioLines as WaveIcon
+  AudioLines as WaveIcon,
+  Timer,
+  Zap,
+  Activity,
+  History,
+  Trash2,
+  ArrowUpRight,
+  Clock
 } from 'lucide-react';
 import { generateDarijaScript, generateDarijaAudio, hasDefaultApiKey, type DarijaScript, type AudioSettings } from './services/geminiService';
+
+export interface PerformanceMetrics {
+  scriptTimeMs: number;
+  audioTimeMs: number | null;
+  totalTimeMs: number;
+  timestamp: Date;
+}
+
+export interface HistoryItem {
+  id: string;
+  inputText: string;
+  script: DarijaScript;
+  audioBase64?: string | null;
+  timestamp: number;
+  voiceName: string;
+  tone?: string;
+  metrics?: PerformanceMetrics | null;
+}
+
+function formatTimeAgo(timestamp: number): string {
+  const diffSec = Math.floor((Date.now() - timestamp) / 1000);
+  if (diffSec < 60) return "À l'instant";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `Il y a ${diffMin} min`;
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `Il y a ${diffHours} h`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `Il y a ${diffDays} j`;
+}
 
 const VOICES = [
   { id: 'Kore', name: 'Kore (Female - Neutral)', gender: 'Female' },
@@ -54,6 +90,24 @@ export default function App() {
   const [isPaused, setIsPaused] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toneDropdownOpen, setToneDropdownOpen] = useState(false);
+  const [metrics, setMetrics] = useState<PerformanceMetrics | null>(null);
+  
+  const [history, setHistory] = useState<HistoryItem[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('darijavox_history');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            return parsed.slice(0, 5);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load history from localStorage', e);
+      }
+    }
+    return [];
+  });
   
   const [apiKey, setApiKey] = useState(() => {
     return typeof window !== 'undefined' ? localStorage.getItem('darijavox_gemini_api_key') || '' : '';
@@ -134,6 +188,7 @@ export default function App() {
     setError(null);
     setScript(null);
     setAudioBase64(null);
+    setMetrics(null);
     setIsPlaying(false);
     setIsPaused(false);
     
@@ -145,13 +200,20 @@ export default function App() {
       return;
     }
     
+    const startTimeTotal = performance.now();
     try {
       setIsLocalVoiceFallbackActive(false);
+      const scriptStartTime = performance.now();
       const generatedScript = await generateDarijaScript(inputText);
+      const scriptElapsed = Math.round(performance.now() - scriptStartTime);
       setScript(generatedScript);
       
+      let audioElapsed: number | null = null;
+      let audio: string | null = null;
       try {
-        const audio = await generateDarijaAudio(generatedScript.arabicScript, generatedScript.phoneticScript, settings);
+        const audioStartTime = performance.now();
+        audio = await generateDarijaAudio(generatedScript.arabicScript, generatedScript.phoneticScript, settings);
+        audioElapsed = Math.round(performance.now() - audioStartTime);
         if (audio) {
           setAudioBase64(audio);
           prepareAudio(audio);
@@ -160,6 +222,44 @@ export default function App() {
         console.warn("Gemini TTS audio generation failed, activating local speech synthesis fallback.", audioErr);
         setIsLocalVoiceFallbackActive(true);
       }
+
+      const totalElapsed = Math.round(performance.now() - startTimeTotal);
+      const newMetrics: PerformanceMetrics = {
+        scriptTimeMs: scriptElapsed,
+        audioTimeMs: audioElapsed,
+        totalTimeMs: totalElapsed,
+        timestamp: new Date()
+      };
+      setMetrics(newMetrics);
+
+      // Save to local history (capped to 5 latest scripts)
+      const newHistoryItem: HistoryItem = {
+        id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 6),
+        inputText,
+        script: generatedScript,
+        audioBase64: audio || null,
+        timestamp: Date.now(),
+        voiceName: settings.voiceName,
+        tone: settings.tone,
+        metrics: newMetrics
+      };
+
+      setHistory(prev => {
+        const filtered = prev.filter(item => item.inputText.trim() !== inputText.trim());
+        const updated = [newHistoryItem, ...filtered].slice(0, 5);
+        try {
+          localStorage.setItem('darijavox_history', JSON.stringify(updated));
+        } catch (e) {
+          console.warn('Quota exceeded in localStorage with audio payload, saving without audioBase64', e);
+          try {
+            const stripped = updated.map(item => ({ ...item, audioBase64: null }));
+            localStorage.setItem('darijavox_history', JSON.stringify(stripped));
+          } catch (err) {
+            console.error('Failed to store history in localStorage:', err);
+          }
+        }
+        return updated;
+      });
     } catch (err: any) {
       const errMsg = err.message || '';
       if (errMsg === 'API_KEY_MISSING' || errMsg.includes('API key') || errMsg.includes('KEY_INVALID') || errMsg.includes('API_KEY')) {
@@ -193,10 +293,50 @@ export default function App() {
 
     try {
       setIsLocalVoiceFallbackActive(false);
+      const audioStartTime = performance.now();
       const audio = await generateDarijaAudio(script.arabicScript, script.phoneticScript, settings);
+      const audioElapsed = Math.round(performance.now() - audioStartTime);
       if (audio) {
         setAudioBase64(audio);
         await prepareAudio(audio);
+      }
+      setMetrics(prev => {
+        const sTime = prev ? prev.scriptTimeMs : 0;
+        return {
+          scriptTimeMs: sTime,
+          audioTimeMs: audioElapsed,
+          totalTimeMs: sTime + audioElapsed,
+          timestamp: new Date()
+        };
+      });
+
+      // Update history item with fresh audio if found
+      if (audio && script) {
+        setHistory(prev => {
+          const updated = prev.map(item => {
+            if (item.script.arabicScript === script.arabicScript) {
+              return {
+                ...item,
+                audioBase64: audio,
+                voiceName: settings.voiceName,
+                tone: settings.tone,
+                metrics: {
+                  scriptTimeMs: item.metrics?.scriptTimeMs ?? 0,
+                  audioTimeMs: audioElapsed,
+                  totalTimeMs: (item.metrics?.scriptTimeMs ?? 0) + audioElapsed,
+                  timestamp: new Date()
+                }
+              };
+            }
+            return item;
+          });
+          try {
+            localStorage.setItem('darijavox_history', JSON.stringify(updated));
+          } catch {
+            // ignore
+          }
+          return updated;
+        });
       }
     } catch (err: any) {
       const errMsg = err.message || '';
@@ -210,6 +350,58 @@ export default function App() {
       console.error('Voice generation error:', err);
     } finally {
       setIsGeneratingAudio(false);
+    }
+  };
+
+  const handleRestoreHistoryItem = async (item: HistoryItem) => {
+    setInputText(item.inputText);
+    setScript(item.script);
+    setAudioBase64(item.audioBase64 || null);
+    setIsPlaying(false);
+    setIsPaused(false);
+    setError(null);
+    setIsLocalVoiceFallbackActive(false);
+
+    if (item.voiceName) {
+      setSettings(prev => ({
+        ...prev,
+        voiceName: item.voiceName,
+        tone: item.tone || prev.tone
+      }));
+    }
+
+    if (item.metrics) {
+      setMetrics(item.metrics);
+    } else {
+      setMetrics(null);
+    }
+
+    if (item.audioBase64) {
+      await prepareAudio(item.audioBase64);
+    } else {
+      audioBufferRef.current = null;
+    }
+  };
+
+  const handleDeleteHistoryItem = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setHistory(prev => {
+      const updated = prev.filter(item => item.id !== id);
+      try {
+        localStorage.setItem('darijavox_history', JSON.stringify(updated));
+      } catch (err) {
+        console.error('Failed to remove history item from localStorage', err);
+      }
+      return updated;
+    });
+  };
+
+  const handleClearHistory = () => {
+    setHistory([]);
+    try {
+      localStorage.removeItem('darijavox_history');
+    } catch (err) {
+      console.error('Failed to clear history from localStorage', err);
     }
   };
 
@@ -894,6 +1086,128 @@ export default function App() {
               )}
             </AnimatePresence>
           </motion.button>
+
+          {/* Local History Section (5 Latest Scripts) */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="glass-card p-6 md:p-7 space-y-4"
+          >
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-fuchsia-500/15 border border-fuchsia-500/30 flex items-center justify-center text-fuchsia-400 shrink-0">
+                  <History className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-100">
+                    Historique Récent
+                  </h3>
+                  <p className="text-[10px] text-slate-400">
+                    5 derniers scripts en cache local
+                  </p>
+                </div>
+              </div>
+
+              {history.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearHistory}
+                  className="text-[10px] text-slate-400 hover:text-rose-400 flex items-center gap-1.5 transition-colors px-2.5 py-1 rounded-xl hover:bg-white/5 font-semibold"
+                  title="Effacer tout l'historique"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Effacer</span>
+                </button>
+              )}
+            </div>
+
+            {history.length === 0 ? (
+              <div className="py-8 text-center space-y-2">
+                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center mx-auto text-slate-500">
+                  <Clock className="w-5 h-5 opacity-70" />
+                </div>
+                <p className="text-xs text-slate-300 font-semibold">
+                  Aucun script récent
+                </p>
+                <p className="text-[11px] text-slate-400 max-w-xs mx-auto leading-relaxed">
+                  Vos 5 derniers scripts générés apparaîtront automatiquement ici pour les réécouter ou les réutiliser en 1 clic.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {history.map((item, index) => {
+                  const isCurrentActive = script?.arabicScript === item.script.arabicScript;
+                  const timeAgo = formatTimeAgo(item.timestamp);
+
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => handleRestoreHistoryItem(item)}
+                      className={`group p-4 rounded-2xl transition-all cursor-pointer border relative overflow-hidden text-left ${
+                        isCurrentActive
+                          ? 'bg-fuchsia-500/10 border-fuchsia-500/40 shadow-lg shadow-fuchsia-500/5 ring-1 ring-fuchsia-500/20'
+                          : 'bg-white/5 hover:bg-white/10 border-white/5 hover:border-white/15'
+                      }`}
+                      title="Cliquer pour restaurer ce script dans le studio"
+                    >
+                      <div className="space-y-2">
+                        {/* Top meta tags */}
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-white/10 text-slate-200">
+                              #{index + 1}
+                            </span>
+                            <span className="text-[11px] font-semibold text-fuchsia-400">
+                              {item.voiceName} {item.tone && item.tone !== 'Standard' ? `• ${item.tone}` : ''}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            {item.metrics && (
+                              <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                {item.metrics.totalTimeMs} ms
+                              </span>
+                            )}
+                            <span className="text-[9px] text-slate-400 font-mono">
+                              {timeAgo}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Source prompt preview */}
+                        <p className="text-xs text-slate-200 font-medium line-clamp-2 leading-relaxed group-hover:text-white transition-colors">
+                          {item.inputText}
+                        </p>
+
+                        {/* Arabic text preview */}
+                        <p className="text-xs arabic-font text-slate-400 line-clamp-1 text-right pt-0.5 border-t border-white/5" dir="rtl">
+                          {item.script.arabicScript}
+                        </p>
+
+                        {/* Footer action bar */}
+                        <div className="flex items-center justify-between pt-1 border-t border-white/5">
+                          <span className="text-[10px] text-slate-400 group-hover:text-fuchsia-300 font-semibold flex items-center gap-1 transition-colors">
+                            <span>Restaurer</span>
+                            <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteHistoryItem(item.id, e)}
+                            className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                            title="Supprimer cet élément de l'historique"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </motion.div>
         </div>
 
         {/* Studio Panel */}
@@ -965,6 +1279,143 @@ export default function App() {
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-8"
               >
+                {/* Performance & Latency Indicator Card */}
+                {metrics && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.98, y: -10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    className="glass-card p-6 md:p-8 border border-emerald-500/20 bg-gradient-to-r from-emerald-950/20 via-slate-950/40 to-indigo-950/20 relative overflow-hidden"
+                  >
+                    {/* Subtle top indicator bar */}
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-fuchsia-500 to-indigo-500" />
+                    
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                          <Activity className="w-5 h-5 animate-pulse" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-slate-100">
+                              Indicateur de Performance
+                            </h3>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 animate-ping" />
+                              SUCCÈS
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-400">
+                            Temps écoulé mesuré avec précision après chaque traitement réussi
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Global elapsed time pill */}
+                      <div className="flex items-center gap-2 self-stretch sm:self-auto justify-between sm:justify-end bg-black/30 px-4 py-2 rounded-2xl border border-white/10">
+                        <span className="text-[10px] font-mono uppercase text-slate-400 tracking-wider">Durée Totale :</span>
+                        <span className="font-mono text-xs md:text-sm font-bold text-emerald-400 flex items-center gap-1.5">
+                          <Timer className="w-4 h-4 text-emerald-400" />
+                          {metrics.totalTimeMs.toLocaleString('fr-FR')} ms
+                          <span className="text-[10px] text-slate-400 font-normal">
+                            ({(metrics.totalTimeMs / 1000).toFixed(2)}s)
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Metric Cards Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
+                      {/* 1. Script Generation Timing */}
+                      <div className="p-4 rounded-2xl bg-slate-900/50 border border-white/5 space-y-2">
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span className="text-[10px] font-mono uppercase tracking-wider">1. Génération Script</span>
+                          <FileText className="w-3.5 h-3.5 text-fuchsia-400" />
+                        </div>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-2xl font-mono font-bold text-fuchsia-400">
+                            {metrics.scriptTimeMs.toLocaleString('fr-FR')}
+                          </span>
+                          <span className="text-xs font-mono text-slate-400 font-semibold">ms</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-white/5">
+                          <span>Gemini Dialect Engine</span>
+                          <span className="font-mono text-slate-300">{(metrics.scriptTimeMs / 1000).toFixed(2)}s</span>
+                        </div>
+                      </div>
+
+                      {/* 2. Audio Generation Timing */}
+                      <div className="p-4 rounded-2xl bg-slate-900/50 border border-white/5 space-y-2">
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span className="text-[10px] font-mono uppercase tracking-wider">2. Synthèse Audio</span>
+                          <Volume2 className="w-3.5 h-3.5 text-indigo-400" />
+                        </div>
+                        <div className="flex items-baseline gap-1.5">
+                          {metrics.audioTimeMs !== null ? (
+                            <>
+                              <span className="text-2xl font-mono font-bold text-indigo-400">
+                                {metrics.audioTimeMs.toLocaleString('fr-FR')}
+                              </span>
+                              <span className="text-xs font-mono text-slate-400 font-semibold">ms</span>
+                            </>
+                          ) : (
+                            <span className="text-base font-semibold text-amber-400">Mode Local</span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-white/5">
+                          <span>Voix: {settings.voiceName}</span>
+                          {metrics.audioTimeMs !== null && (
+                            <span className="font-mono text-slate-300">{(metrics.audioTimeMs / 1000).toFixed(2)}s</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 3. Combined / Latency Summary */}
+                      <div className="p-4 rounded-2xl bg-slate-900/50 border border-white/5 space-y-2">
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span className="text-[10px] font-mono uppercase tracking-wider">3. Traitement Total</span>
+                          <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                        </div>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-2xl font-mono font-bold text-emerald-400">
+                            {metrics.totalTimeMs.toLocaleString('fr-FR')}
+                          </span>
+                          <span className="text-xs font-mono text-slate-400 font-semibold">ms</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-white/5">
+                          <span>Pipeline IA complet</span>
+                          <span className="font-mono text-emerald-300/80">100% terminé</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Distribution bar */}
+                    {metrics.audioTimeMs !== null && metrics.totalTimeMs > 0 && (
+                      <div className="mt-4 pt-3 border-t border-white/5 space-y-1.5">
+                        <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                          <span className="text-fuchsia-400">
+                            Script : {Math.round((metrics.scriptTimeMs / metrics.totalTimeMs) * 100)}% ({metrics.scriptTimeMs.toLocaleString('fr-FR')} ms)
+                          </span>
+                          <span className="text-indigo-400">
+                            Audio : {Math.round((metrics.audioTimeMs / metrics.totalTimeMs) * 100)}% ({metrics.audioTimeMs.toLocaleString('fr-FR')} ms)
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-slate-800/80 rounded-full overflow-hidden flex">
+                          <div 
+                            style={{ width: `${Math.min(100, Math.max(5, (metrics.scriptTimeMs / metrics.totalTimeMs) * 100))}%` }} 
+                            className="h-full bg-fuchsia-500 rounded-l-full"
+                            title={`Script: ${metrics.scriptTimeMs} ms`}
+                          />
+                          <div 
+                            style={{ width: `${Math.min(100, Math.max(5, (metrics.audioTimeMs / metrics.totalTimeMs) * 100))}%` }} 
+                            className="h-full bg-indigo-500 rounded-r-full"
+                            title={`Audio: ${metrics.audioTimeMs} ms`}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
                 {/* Audio Engine */}
                 <div className="glass-card p-10 space-y-8 relative overflow-hidden">
                    {isLocalVoiceFallbackActive && (
@@ -1026,9 +1477,19 @@ export default function App() {
                         <div className="flex items-center gap-2">
                            <WaveIcon className="w-4 h-4 text-slate-400" />
                            <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-400">Atmospheric Monitor</span>
+                           {metrics && (
+                             <span className="ml-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-mono font-bold flex items-center gap-1">
+                               <Timer className="w-2.5 h-2.5" />
+                               {metrics.totalTimeMs.toLocaleString('fr-FR')} ms
+                             </span>
+                           )}
                         </div>
                         <span className="text-[10px] font-mono text-slate-400">
-                          {isGeneratingAudio ? 'VOICE SYNTHESIS ACTIVE' : '24.0 KHZ / 128 KBPS'}
+                          {isGeneratingAudio 
+                            ? 'VOICE SYNTHESIS ACTIVE' 
+                            : metrics 
+                              ? `LATENCE : ${metrics.totalTimeMs} MS (SCRIPT : ${metrics.scriptTimeMs} MS • AUDIO : ${metrics.audioTimeMs ?? 0} MS)`
+                              : '24.0 KHZ / 128 KBPS'}
                         </span>
                       </div>
                       <div className="h-24 glass-card bg-slate-950/20 border-white/5 border flex items-end justify-center gap-1.5 p-6 overflow-hidden">
